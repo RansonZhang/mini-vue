@@ -3,17 +3,17 @@ import { h, ref } from '../../lib/guide-mini-vue-esm.js';
 // 1.左侧对比
 // (a b) c
 // (a b) d e
-const prevChildren = [
-  h('p', { key: 'a' }, 'a'),
-  h('p', { key: 'b' }, 'b'),
-  h('p', { key: 'c' }, 'c'),
-];
-const nextChildren = [
-  h('p', { key: 'a' }, 'a'),
-  h('p', { key: 'b' }, 'b'),
-  h('p', { key: 'd' }, 'd'),
-  h('p', { key: 'e' }, 'e'),
-];
+// const prevChildren = [
+//   h('p', { key: 'a' }, 'a'),
+//   h('p', { key: 'b' }, 'b'),
+//   h('p', { key: 'c' }, 'c'),
+// ];
+// const nextChildren = [
+//   h('p', { key: 'a' }, 'a'),
+//   h('p', { key: 'b' }, 'b'),
+//   h('p', { key: 'd' }, 'd'),
+//   h('p', { key: 'e' }, 'e'),
+// ];
 
 // 2.右侧对比
 // a (b c)
@@ -76,6 +76,27 @@ const nextChildren = [
 // 5.1 创建新的。旧的不存在，新的存在
 // 5.2 删除旧的。旧的存在，新的不存在
 // 5.3 移动旧的。新旧都存在，位置改变了
+
+// 5.1 删除旧的
+// a b (c d) f g
+// a b (e c) f g
+const prevChildren = [
+  h('p', { key: 'a' }, 'a'),
+  h('p', { key: 'b' }, 'b'),
+  h('p', { key: 'c', id: 'c-prev' }, 'c'),
+  h('p', { key: 'e' }, 'e'),
+  h('p', { key: 'd' }, 'd'),
+  h('p', { key: 'f' }, 'f'),
+  h('p', { key: 'g' }, 'g'),
+];
+const nextChildren = [
+  h('p', { key: 'a' }, 'a'),
+  h('p', { key: 'b' }, 'b'),
+  h('p', { key: 'e' }, 'e'),
+  h('p', { key: 'c', id: 'c-next' }, 'c'),
+  h('p', { key: 'f' }, 'f'),
+  h('p', { key: 'g' }, 'g'),
+];
 
 export default {
   name: 'ArrayToArray',
