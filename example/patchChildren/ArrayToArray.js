@@ -80,23 +80,68 @@ import { h, ref } from '../../lib/guide-mini-vue-esm.js';
 // 5.1 删除旧的
 // a b (c d) f g
 // a b (e c) f g
+// const prevChildren = [
+//   h('p', { key: 'a' }, 'a'),
+//   h('p', { key: 'b' }, 'b'),
+//   h('p', { key: 'c', id: 'c-prev' }, 'c'),
+//   h('p', { key: 'e' }, 'e'),
+//   h('p', { key: 'd' }, 'd'),
+//   h('p', { key: 'f' }, 'f'),
+//   h('p', { key: 'g' }, 'g'),
+// ];
+// const nextChildren = [
+//   h('p', { key: 'a' }, 'a'),
+//   h('p', { key: 'b' }, 'b'),
+//   h('p', { key: 'e' }, 'e'),
+//   h('p', { key: 'c', id: 'c-next' }, 'c'),
+//   h('p', { key: 'f' }, 'f'),
+//   h('p', { key: 'g' }, 'g'),
+// ];
+
+// 5.2 移动旧节点
+// a,b,(c,d,e),f,g
+// a,b,(e,c,d),f,g
 const prevChildren = [
-  h('p', { key: 'a' }, 'a'),
-  h('p', { key: 'b' }, 'b'),
-  h('p', { key: 'c', id: 'c-prev' }, 'c'),
-  h('p', { key: 'e' }, 'e'),
-  h('p', { key: 'd' }, 'd'),
-  h('p', { key: 'f' }, 'f'),
-  h('p', { key: 'g' }, 'g'),
+  h('p', { key: 'A' }, 'A'),
+  h('p', { key: 'B' }, 'B'),
+  h('p', { key: 'C' }, 'C'),
+  h('p', { key: 'D' }, 'D'),
+  h('p', { key: 'E' }, 'E'),
+  h('p', { key: 'F' }, 'F'),
+  h('p', { key: 'G' }, 'G'),
 ];
+
 const nextChildren = [
-  h('p', { key: 'a' }, 'a'),
-  h('p', { key: 'b' }, 'b'),
-  h('p', { key: 'e' }, 'e'),
-  h('p', { key: 'c', id: 'c-next' }, 'c'),
-  h('p', { key: 'f' }, 'f'),
-  h('p', { key: 'g' }, 'g'),
+  h('p', { key: 'A' }, 'A'),
+  h('p', { key: 'B' }, 'B'),
+  h('p', { key: 'E' }, 'E'),
+  h('p', { key: 'C' }, 'C'),
+  h('p', { key: 'D' }, 'D'),
+  h('p', { key: 'F' }, 'F'),
+  h('p', { key: 'G' }, 'G'),
 ];
+
+// 5.3. 创建新节点。旧节点中不存在
+// a,b,(c,e),f,g
+// a,b,(e,c,d),f,g
+// const prevChildren = [
+//   h("p", { key: "A" }, "A"),
+//   h("p", { key: "B" }, "B"),
+//   h("p", { key: "C" }, "C"),
+//   h("p", { key: "E" }, "E"),
+//   h("p", { key: "F" }, "F"),
+//   h("p", { key: "G" }, "G"),
+// ];
+
+// const nextChildren = [
+//   h("p", { key: "A" }, "A"),
+//   h("p", { key: "B" }, "B"),
+//   h("p", { key: "E" }, "E"),
+//   h("p", { key: "C" }, "C"),
+//   h("p", { key: "D" }, "D"),
+//   h("p", { key: "F" }, "F"),
+//   h("p", { key: "G" }, "G"),
+// ];
 
 export default {
   name: 'ArrayToArray',

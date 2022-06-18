@@ -4,6 +4,7 @@ import { createComponentInstance, setupComponent } from './component';
 import { createAppAPI } from './createApp';
 import { Fragment, Text } from './vnode';
 import { EMPTY_OBJ } from '../shared';
+import { shouldUpdateComponent } from './componentUpdateUtils';
 
 export function createRender(options: any) {
   const {
@@ -59,28 +60,6 @@ export function createRender(options: any) {
     container.append(textNode);
   }
 
-  function processComponent(
-    n1: any,
-    n2: any,
-    container: any,
-    parentComponent: any,
-    anchor: any
-  ) {
-    mountComponent(n2, container, parentComponent, anchor);
-  }
-
-  function mountComponent(
-    initialVNode,
-    container,
-    parentComponent,
-    anchor: any
-  ) {
-    const instance = createComponentInstance(initialVNode, parentComponent);
-
-    setupComponent(instance);
-    setupRenderEffect(instance, initialVNode, container, anchor);
-  }
-
   function processElement(
     n1: any,
     n2: any,
@@ -93,6 +72,40 @@ export function createRender(options: any) {
     } else {
       patchElement(n1, n2, container, parentComponent, anchor);
     }
+  }
+
+  function mountElement(
+    vnode: any,
+    container: any,
+    parentComponent: any,
+    anchor: any
+  ) {
+    const { type, props, children, shapeFlag } = vnode;
+    const el = (vnode.el = hostCreateElement(type));
+
+    if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
+      el.textContent = children;
+    } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+      mountChildren(vnode.children, el, parentComponent, anchor);
+    }
+
+    for (const key in props) {
+      const val = props[key];
+      hostPatchProp(el, key, null, val);
+    }
+
+    hostInsert(el, container, anchor);
+  }
+
+  function mountChildren(
+    children: any,
+    container: any,
+    parentComponent: any,
+    anchor: any
+  ) {
+    children.forEach(child =>
+      patch(null, child, container, parentComponent, anchor)
+    );
   }
 
   function patchElement(
@@ -154,56 +167,61 @@ export function createRender(options: any) {
       return n1.type === n2.type && n1.key === n2.key;
     }
 
-    // from left
+    // 左起比对
     while (i <= e1 && i <= e2) {
       const n1 = c1[i];
       const n2 = c2[i];
-      if (isSomeVnodeType(n1, n2)) {
-        patch(n1, n2, container, parentComponent, parentAnchor);
-      } else {
+
+      if (!isSomeVnodeType(n1, n2)) {
         break;
       }
+
+      patch(n1, n2, container, parentComponent, parentAnchor);
       i++;
     }
 
-    // from right
+    // 右起比对
     while (i <= e1 && i <= e2) {
       const n1 = c1[e1];
       const n2 = c2[e2];
-      if (isSomeVnodeType(n1, n2)) {
-        patch(n1, n2, container, parentComponent, parentAnchor);
-      } else {
+      if (!isSomeVnodeType(n1, n2)) {
         break;
       }
+
+      patch(n1, n2, container, parentComponent, parentAnchor);
       e1--;
       e2--;
     }
 
-    // c2.length !== c1.length
-    if (i > e1) {
-      // create new dom
-      if (i <= e2) {
-        const nextPos = e2 + 1;
-        const anchor = nextPos < l2 ? c2[nextPos].el : null;
-        while (i <= e2) {
-          patch(null, c2[i], container, parentComponent, anchor);
-          i++;
-        }
+    // 新旧节点长度不同，且是新节点比旧节点数量多
+    if (i > e1 && i <= e2) {
+      // 创建新节点
+      const nextPos = e2 + 1;
+      // 新节点可能会加到末尾，也可能是头部，需要制定添加的位置
+      // 添加的位置是当前位置(e2开始)+1
+      const anchor = nextPos < l2 ? c2[nextPos].el : null;
+      while (i <= e2) {
+        patch(null, c2[i], container, parentComponent, anchor);
+        i++;
       }
-    } else if (i > e2) {
-      // delete old dom
+    } else if (i > e2 && i <= e1) {
+      // 删除旧节点
       while (i <= e1) {
         hostRemove(c1[i].el);
         i++;
       }
     } else {
-      // compare mid part
+      // 对比中间部分
       let s1 = i;
       let s2 = i;
 
       const toBePatched = e2 - s2 + 1;
       let patched = 0;
       const keyToNewIndexMap = new Map();
+      const newIndexToOldIndexMap = new Array(toBePatched);
+      let moved = false; // 是否发生了旧节点移动
+      let maxNewIndexSoFar = 0;
+      for (let i = 0; i < toBePatched; i++) newIndexToOldIndexMap[i] = 0;
 
       for (let i = s2; i <= e2; i++) {
         const nextChild = c2[i];
@@ -221,7 +239,7 @@ export function createRender(options: any) {
         if (prevChild.key !== null) {
           newIndex = keyToNewIndexMap.get(prevChild.key);
         } else {
-          for (let j = s2; j < e2; j++) {
+          for (let j = s2; j <= e2; j++) {
             if (isSomeVnodeType(prevChild, c2[j])) {
               newIndex = j;
               break;
@@ -232,8 +250,37 @@ export function createRender(options: any) {
         if (newIndex === undefined) {
           hostRemove(prevChild.el);
         } else {
+          if (newIndex >= maxNewIndexSoFar) {
+            maxNewIndexSoFar = newIndex;
+          } else {
+            moved = true;
+          }
+          newIndexToOldIndexMap[newIndex - s2] = i + 1;
           patch(prevChild, c2[newIndex], container, parentComponent, null);
           patched++;
+        }
+      }
+
+      // 最长增长子序列
+      const increasingNewIndexSequence = moved
+        ? getSequence(newIndexToOldIndexMap)
+        : [];
+      let j = increasingNewIndexSequence.length - 1;
+
+      for (let i = toBePatched - 1; i >= 0; i--) {
+        const nextIndex = i + s2;
+        const nextChild = c2[nextIndex];
+        const anchor = nextIndex + 1 < l2 ? c2[nextIndex + 1].el : null;
+        if (newIndexToOldIndexMap[i] === 0) {
+          // 旧节点中不存在新节点的序号，即需要创建
+          patch(null, nextChild, container, parentComponent, anchor);
+        } else if (moved) {
+          if (j < 0 || i !== increasingNewIndexSequence[j]) {
+            // 移动旧节点
+            hostInsert(nextChild.el, container, anchor);
+          } else {
+            j--;
+          }
         }
       }
     }
@@ -264,38 +311,33 @@ export function createRender(options: any) {
     }
   }
 
-  function mountElement(
-    vnode: any,
+  function processComponent(
+    n1: any,
+    n2: any,
     container: any,
     parentComponent: any,
     anchor: any
   ) {
-    const { type, props, children, shapeFlag } = vnode;
-    const el = (vnode.el = hostCreateElement(type));
-
-    if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
-      el.textContent = children;
-    } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-      mountChildren(vnode.children, el, parentComponent, anchor);
+    if (!n1) {
+      mountComponent(n2, container, parentComponent, anchor);
+    } else {
+      updateComponent(n1, n2);
     }
-
-    for (const key in props) {
-      const val = props[key];
-      hostPatchProp(el, key, null, val);
-    }
-
-    hostInsert(el, container, anchor);
   }
 
-  function mountChildren(
-    children: any,
-    container: any,
-    parentComponent: any,
+  function mountComponent(
+    initialVNode,
+    container,
+    parentComponent,
     anchor: any
   ) {
-    children.forEach(child =>
-      patch(null, child, container, parentComponent, anchor)
-    );
+    const instance = (initialVNode.component = createComponentInstance(
+      initialVNode,
+      parentComponent
+    ));
+
+    setupComponent(instance);
+    setupRenderEffect(instance, initialVNode, container, anchor);
   }
 
   function setupRenderEffect(
@@ -304,7 +346,7 @@ export function createRender(options: any) {
     container: any,
     anchor: any
   ) {
-    effect(() => {
+    instance.update = effect(() => {
       if (!instance.isMounted) {
         const { proxy } = instance;
         const subTree = (instance.subTree = instance.render.call(proxy));
@@ -314,7 +356,11 @@ export function createRender(options: any) {
         initialVNode.el = subTree.el;
         instance.isMounted = true;
       } else {
-        const { proxy } = instance;
+        const { next, vnode, proxy } = instance;
+        if (next) {
+          next.el = vnode.el;
+          updateComponentPreRender(instance, next);
+        }
         const subTree = instance.render.call(proxy);
         const prevSubTree = instance.subTree;
         instance.subTree = subTree;
@@ -324,7 +370,65 @@ export function createRender(options: any) {
     });
   }
 
+  function updateComponentPreRender(instance: any, nextVNode: any) {
+    instance.vnode = nextVNode;
+    instance.next = null;
+    instance.props = nextVNode.props;
+  }
+
+  function updateComponent(n1: any, n2: any) {
+    const instance = (n2.component = n1.component);
+    if (shouldUpdateComponent(n1, n2)) {
+      instance.next = n2;
+      instance.update();
+    } else {
+      n2.el = n1.el;
+      instance.vnode = n2;
+    }
+  }
+
   return {
     createApp: createAppAPI(render),
   };
+}
+
+function getSequence(arr: number[]): number[] {
+  const p = arr.slice();
+  const result = [0];
+  let i, j, u, v, c;
+  const len = arr.length;
+  for (i = 0; i < len; i++) {
+    const arrI = arr[i];
+    if (arrI !== 0) {
+      j = result[result.length - 1];
+      if (arr[j] < arrI) {
+        p[i] = j;
+        result.push(i);
+        continue;
+      }
+      u = 0;
+      v = result.length - 1;
+      while (u < v) {
+        c = (u + v) >> 1;
+        if (arr[result[c]] < arrI) {
+          u = c + 1;
+        } else {
+          v = c;
+        }
+      }
+      if (arrI < arr[result[u]]) {
+        if (u > 0) {
+          p[i] = result[u - 1];
+        }
+        result[u] = i;
+      }
+    }
+  }
+  u = result.length;
+  v = result[u - 1];
+  while (u-- > 0) {
+    result[u] = v;
+    v = p[v];
+  }
+  return result;
 }
