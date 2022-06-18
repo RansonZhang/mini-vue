@@ -5,6 +5,7 @@ import { createAppAPI } from './createApp';
 import { Fragment, Text } from './vnode';
 import { EMPTY_OBJ } from '../shared';
 import { shouldUpdateComponent } from './componentUpdateUtils';
+import { queueJobs } from './scheduler';
 
 export function createRender(options: any) {
   const {
@@ -346,28 +347,35 @@ export function createRender(options: any) {
     container: any,
     anchor: any
   ) {
-    instance.update = effect(() => {
-      if (!instance.isMounted) {
-        const { proxy } = instance;
-        const subTree = (instance.subTree = instance.render.call(proxy));
+    instance.update = effect(
+      () => {
+        if (!instance.isMounted) {
+          const { proxy } = instance;
+          const subTree = (instance.subTree = instance.render.call(proxy));
 
-        patch(null, subTree, container, instance, anchor);
+          patch(null, subTree, container, instance, anchor);
 
-        initialVNode.el = subTree.el;
-        instance.isMounted = true;
-      } else {
-        const { next, vnode, proxy } = instance;
-        if (next) {
-          next.el = vnode.el;
-          updateComponentPreRender(instance, next);
+          initialVNode.el = subTree.el;
+          instance.isMounted = true;
+        } else {
+          const { next, vnode, proxy } = instance;
+          if (next) {
+            next.el = vnode.el;
+            updateComponentPreRender(instance, next);
+          }
+          const subTree = instance.render.call(proxy);
+          const prevSubTree = instance.subTree;
+          instance.subTree = subTree;
+
+          patch(prevSubTree, subTree, container, instance, anchor);
         }
-        const subTree = instance.render.call(proxy);
-        const prevSubTree = instance.subTree;
-        instance.subTree = subTree;
-
-        patch(prevSubTree, subTree, container, instance, anchor);
+      },
+      {
+        scheduler: () => {
+          queueJobs(instance.update);
+        },
       }
-    });
+    );
   }
 
   function updateComponentPreRender(instance: any, nextVNode: any) {
