@@ -8,7 +8,7 @@ const enum TagType {
 export function baseParse(content: string) {
   const context = createParserContext(content);
 
-  return createRoot(parseChildren(context));
+  return createRoot(parseChildren(context, []));
 }
 
 function createParserContext(content: string) {
@@ -23,24 +23,48 @@ function createRoot(children) {
   };
 }
 
-function parseChildren(context: any) {
+function parseChildren(context: any, ancestors: any[]) {
   const nodes: any[] = [];
-  let node;
+
+  while (!isEnd(context, ancestors)) {
+    let node;
+    const source = context.source;
+    if (source.startsWith('{{')) {
+      node = parseInterpolation(context);
+    } else if (source[0] === '<') {
+      if (/[a-z]/i.test(source[1])) {
+        node = parseElement(context, ancestors);
+      }
+    }
+
+    if (!node) {
+      node = parseText(context);
+    }
+    nodes.push(node);
+  }
+
+  return nodes;
+}
+
+function isEnd(context: any, ancestors: any[]) {
   const source = context.source;
-  if (source.startsWith('{{')) {
-    node = parseInterpolation(context);
-  } else if (source[0] === '<') {
-    if (/[a-z]/i.test(source[1])) {
-      node = parseElement(context);
+  if (source.startsWith('</')) {
+    for (let i = ancestors.length - 1; i >= 0; i--) {
+      const tag = ancestors[i].tag;
+      if (startsWithEndTagOpen(source, tag)) {
+        return true;
+      }
     }
   }
 
-  if (!node) {
-    node = parseText(context);
-  }
-  nodes.push(node);
+  return !source;
+}
 
-  return nodes;
+function startsWithEndTagOpen(source: any, tag: string) {
+  return (
+    source.startsWith('<') &&
+    source.slice(2, 2 + tag.length).toLowerCase() === tag.toLowerCase()
+  );
 }
 
 function parseInterpolation(context: any) {
@@ -73,9 +97,18 @@ function parseTextData(context: any, length: number) {
   return context.source.slice(0, length);
 }
 
-function parseElement(context: any) {
-  const element = parseTag(context, TagType.Start);
-  parseTag(context, TagType.End);
+function parseElement(context: any, ancestors: any[]) {
+  const element: any = parseTag(context, TagType.Start);
+  ancestors.push(element);
+  element.children = parseChildren(context, ancestors);
+  ancestors.pop();
+
+  if (startsWithEndTagOpen(context.source, element.tag)) {
+    parseTag(context, TagType.End);
+  } else {
+    throw new Error(`缺少结束标签：${element.tag}`);
+  }
+
   return element;
 }
 
@@ -93,7 +126,17 @@ function parseTag(context: any, type: TagType) {
 }
 
 function parseText(context: any) {
-  const content = parseTextData(context, context.source.length);
+  let endIndex = context.source.length;
+  // 遇到标签符/插值符时停止推进
+  let endTokens = ['<', '{{'];
+  for (let i = 0; i < endTokens.length; i++) {
+    const index = context.source.indexOf(endTokens[i]);
+    if (index !== -1 && index < endIndex) {
+      endIndex = index;
+    }
+  }
+
+  const content = parseTextData(context, endIndex);
 
   advanceBy(context, content.length);
 
