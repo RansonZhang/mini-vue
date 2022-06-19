@@ -47,17 +47,17 @@ function parseChildren(context: any, ancestors: any[]) {
 }
 
 function isEnd(context: any, ancestors: any[]) {
-  const source = context.source;
-  if (source.startsWith('</')) {
+  const s = context.source;
+  if (s.startsWith('</')) {
     for (let i = ancestors.length - 1; i >= 0; i--) {
       const tag = ancestors[i].tag;
-      if (startsWithEndTagOpen(source, tag)) {
+      if (startsWithEndTagOpen(s, tag)) {
         return true;
       }
     }
   }
 
-  return !source;
+  return !s;
 }
 
 function startsWithEndTagOpen(source: any, tag: string) {
@@ -101,6 +101,7 @@ function parseElement(context: any, ancestors: any[]) {
   const element: any = parseTag(context, TagType.Start);
   ancestors.push(element);
   element.children = parseChildren(context, ancestors);
+  // 此时已解析完所有的标签，从末尾开始弹出
   ancestors.pop();
 
   if (startsWithEndTagOpen(context.source, element.tag)) {
