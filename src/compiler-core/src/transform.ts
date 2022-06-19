@@ -1,9 +1,11 @@
 import { NodeTypes } from './ast';
 
-export function transform(root: any, options: any) {
+export function transform(root: any, options: any = {}) {
   const context = createTransformContext(root, options);
   // 遍历，深度优先搜索
   traverseNode(root, context);
+
+  createRootCodegen(root);
 }
 
 function createTransformContext(root: any, options: any) {
@@ -12,6 +14,10 @@ function createTransformContext(root: any, options: any) {
     nodeTransforms: options.nodeTransforms || [],
   };
   return context;
+}
+
+function createRootCodegen(root: any) {
+  root.codegenNode = root.children[0];
 }
 
 function traverseNode(node: any, context: any) {
