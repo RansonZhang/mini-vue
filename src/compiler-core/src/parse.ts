@@ -20,6 +20,7 @@ function createParserContext(content: string) {
 function createRoot(children) {
   return {
     children,
+    type: NodeTypes.ROOT,
   };
 }
 

@@ -19,6 +19,8 @@ export class ReactiveEffect {
     }
 
     shouldTrack = true;
+    // 执行时给全局的activeEffect赋值
+    // 利用全局属性来获取当前的effect
     activeEffect = this;
     const result = this._fn();
 
