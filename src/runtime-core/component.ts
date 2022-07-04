@@ -41,7 +41,9 @@ function setupStatefulComponent(instance) {
   const { setup } = Component;
   if (setup) {
     setInstance(instance);
-    const setupResult = setup(shallowReadonly(instance.props), { emit: instance.emit });
+    const setupResult = setup(shallowReadonly(instance.props), {
+      emit: instance.emit,
+    });
     setInstance(null);
 
     handleSetupResult(instance, setupResult);
@@ -60,7 +62,13 @@ function handleSetupResult(instance, setupResult) {
 
 function finishComponentSetup(instance) {
   const Component = instance.type;
-
+  const { render, template } = Component;
+  // 如果用户写了render，该优先级最高
+  if (compiler && !render) {
+    if (template) {
+      Component.render = compiler(template);
+    }
+  }
   instance.render = Component.render;
 }
 
@@ -70,4 +78,9 @@ function setInstance(instance: any) {
 
 export function getCurrentInstance() {
   return currentInstance;
+}
+
+let compiler;
+export function registerRuntimeCompiler(_compiler: any) {
+  compiler = _compiler;
 }
