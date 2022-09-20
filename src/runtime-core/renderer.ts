@@ -68,11 +68,9 @@ export function createRender(options: any) {
     parentComponent: any,
     anchor: any
   ) {
-    if (!n1) {
-      mountElement(n2, container, parentComponent, anchor);
-    } else {
-      patchElement(n1, n2, container, parentComponent, anchor);
-    }
+    !n1
+      ? mountElement(n2, container, parentComponent, anchor)
+      : patchElement(n1, n2, container, parentComponent, anchor);
   }
 
   function mountElement(
@@ -319,11 +317,9 @@ export function createRender(options: any) {
     parentComponent: any,
     anchor: any
   ) {
-    if (!n1) {
-      mountComponent(n2, container, parentComponent, anchor);
-    } else {
-      updateComponent(n1, n2);
-    }
+    !n1
+      ? mountComponent(n2, container, parentComponent, anchor)
+      : updateComponent(n1, n2);
   }
 
   function mountComponent(
